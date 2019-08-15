@@ -406,6 +406,17 @@ function getBucketVersioning() {
     });
 }
 
+function listObjectVersions() {
+    cos.listObjectVersions({
+        Bucket: config.Bucket, // Bucket 格式：test-1250000000
+        Region: config.Region,
+        // Prefix: "",
+        // Delimiter: '/'
+    }, function (err, data) {
+        console.log(err || JSON.stringify(data, null, '    '));
+    });
+}
+
 function putBucketReplication() {
     var AppId = config.Bucket.substr(config.Bucket.lastIndexOf('-') + 1);
     cos.putBucketReplication({
@@ -442,6 +453,106 @@ function deleteBucketReplication() {
         Bucket: config.Bucket, // Bucket 格式：test-1250000000
         Region: config.Region
     }, function (err, data) {
+        console.log(err || data);
+    });
+}
+
+function putBucketWebsite() {
+    cos.putBucketWebsite({
+        Bucket: config.Bucket, // Bucket 格式：test-1250000000
+        Region: config.Region,
+        WebsiteConfiguration: {
+            IndexDocument: {
+                Suffix: "index.html"
+            },
+            RedirectAllRequestsTo: {
+                Protocol: "https"
+            },
+            ErrorDocument: {
+                Key: "error.html"
+            },
+            // RoutingRules: [{
+            //     Condition: {
+            //         HttpErrorCodeReturnedEquals: "404"
+            //     },
+            //     Redirect: {
+            //         Protocol: "https",
+            //         ReplaceKeyWith: "404.html"
+            //     }
+            // }, {
+            //     Condition: {
+            //         KeyPrefixEquals: "docs/"
+            //     },
+            //     Redirect: {
+            //         Protocol: "https",
+            //         ReplaceKeyPrefixWith: "documents/"
+            //     }
+            // }, {
+            //     Condition: {
+            //         KeyPrefixEquals: "img/"
+            //     },
+            //     Redirect: {
+            //         Protocol: "https",
+            //         ReplaceKeyWith: "picture.jpg"
+            //     }
+            // }]
+        }
+    }, function (err, data) {
+        console.log(err || data);
+    });
+}
+
+function getBucketWebsite() {
+    cos.getBucketWebsite({
+        Bucket: config.Bucket, // Bucket 格式：test-1250000000
+        Region: config.Region
+    },function(err, data){
+        console.log(err || data);
+    });
+}
+
+function deleteBucketWebsite() {
+    cos.deleteBucketWebsite({
+        Bucket: config.Bucket, // Bucket 格式：test-1250000000
+        Region: config.Region
+    },function(err, data){
+        console.log(err || data);
+    });
+}
+
+function putBucketDomain() {
+    cos.putBucketDomain({
+        Bucket: config.Bucket, // Bucket 格式：test-1250000000
+        Region: config.Region,
+        DomainRule:[{
+            Status: "DISABLED",
+            Name: "www.testDomain1.com",
+            Type: "REST"
+        },
+        {
+            Status: "DISABLED",
+            Name: "www.testDomain2.com",
+            Type: "WEBSITE"
+        }]
+    },function(err, data){
+        console.log(err || data);
+    });
+}
+
+function getBucketDomain() {
+    cos.getBucketDomain({
+        Bucket: config.Bucket, // Bucket 格式：test-1250000000
+        Region: config.Region
+    },function(err, data){
+        console.log(err || data);
+    });
+}
+
+function deleteBucketDomain() {
+    cos.deleteBucketDomain({
+        Bucket: config.Bucket, // Bucket 格式：test-1250000000
+        Region: config.Region
+    },function(err, data){
         console.log(err || data);
     });
 }
@@ -530,17 +641,6 @@ function headObject() {
         Key: '1mb.zip'
     }, function (err, data) {
         console.log(err || data);
-    });
-}
-
-function listObjectVersions() {
-    cos.listObjectVersions({
-        Bucket: config.Bucket, // Bucket 格式：test-1250000000
-        Region: config.Region,
-        // Prefix: "",
-        // Delimiter: '/'
-    }, function (err, data) {
-        console.log(err || JSON.stringify(data, null, '    '));
     });
 }
 
@@ -752,6 +852,7 @@ getService();
 // putBucket();
 // getBucket();
 // headBucket();
+// deleteBucket();
 // putBucketAcl();
 // getBucketAcl();
 // putBucketCors();
@@ -762,17 +863,17 @@ getService();
 // deleteBucketTagging();
 // putBucketPolicy();
 // getBucketPolicy();
+// deleteBucketPolicy();
 // getBucketLocation();
 // getBucketLifecycle();
 // putBucketLifecycle();
 // deleteBucketLifecycle();
+// putBucketVersioning();
 // getBucketVersioning();
 // listObjectVersions();
-// putBucketVersioning();
 // getBucketReplication();
 // putBucketReplication();
 // deleteBucketReplication();
-// deleteBucket();
 // putObject();
 // putObjectCopy();
 // getObject();

@@ -34,6 +34,6 @@
   },
   "devDependencies": {
     "mocha": "^4.0.1",
-    "qcloud-cos-sts": "^3.0.0"
+    "qcloud-cos-sts": "^3.0.1"
   }
 }
