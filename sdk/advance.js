@@ -1195,3 +1195,8 @@ module.exports.init = function (COS, task) {
         COS.prototype[apiName] = util.apiWrapper(apiName, fn);
     });
 };
+
+// 需要进行 promisify 的 API
+module.exports.getPromisifyApis = function() {
+    return Object.keys(API_MAP);
+};

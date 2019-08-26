@@ -265,6 +265,32 @@ var uuid = function () {
     return (S4() + S4() + "-" + S4() + "-" + S4() + "-" + S4() + "-" + S4() + S4() + S4());
 };
 
+// 将 callback 形式转为返回原生 Promise 对象
+var promisify = function(func) {
+    return function() {
+        var _this = this;
+        var args = Array.prototype.slice.call(arguments, 0);
+        return new Promise(function(resolve, reject) {
+            var _callback = function(err, data) {
+                if(err) {
+                    reject(err);
+                } else {
+                    resolve(data);
+                }
+            };
+            args.push(_callback);
+            func.apply(_this, args);
+        });
+    };
+};
+
+var promisifyApis = function(COS, apis) {
+    var target = COS.prototype;
+    each(apis, function(api) {
+        target[api] = promisify(target[api]);
+    });
+};
+
 var hasMissingParams = function (apiName, params) {
     var Bucket = params.Bucket;
     var Region = params.Region;
@@ -545,6 +571,8 @@ var util = {
     getSkewTime: getSkewTime,
     getAuth: getAuth,
     getV4Auth: getV4Auth,
+    promisify: promisify,
+    promisifyApis: promisifyApis,
     isBrowser: false,
 };
 

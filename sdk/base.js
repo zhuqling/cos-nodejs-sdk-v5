@@ -2725,3 +2725,12 @@ module.exports.init = function (COS, task) {
         warnOldApi(apiName, fn, COS.prototype);
     });
 };
+
+// 需要进行 promisify 的 API
+module.exports.getPromisifyApis = function() {
+    var keys = Object.keys(API_MAP);
+    var ignoreKeys = ['getObjectUrl', 'getAuth', 'getV4Auth'];
+    return util.filter(keys, function(key) {
+        return ignoreKeys.indexOf(key) === -1;
+    });
+};
