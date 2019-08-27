@@ -2727,7 +2727,7 @@ module.exports.init = function (COS, task) {
     // 统一包装请求方法
     util.each(API_MAP, function (fn, apiName) {
         COS.prototype[apiName] = util.apiWrapper(apiName, fn);
-        warnOldApi(apiName, fn, COS.prototype);
+        warnOldApi(apiName, COS.prototype[apiName], COS.prototype);
     });
     // 工具方法，直接继承
     util.extend(COS.prototype, UTIL_APIS);
