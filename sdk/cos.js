@@ -66,8 +66,4 @@ advance.init(COS, task);
 COS.getAuthorization = util.getAuth;
 COS.version = pkg.version;
 
-// 对 base 和 advance 下的部分 API 进行 promisify 处理
-util.promisifyApis(COS, base.getPromisifyApis());
-util.promisifyApis(COS, advance.getPromisifyApis());
-
 module.exports = COS;

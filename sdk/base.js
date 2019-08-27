@@ -2696,41 +2696,39 @@ var API_MAP = {
     multipartList: multipartList,
     multipartListPart: multipartListPart,
     multipartAbort: multipartAbort,
+};
 
-    // 工具方法
+// 工具方法
+var UTIL_APIS = {
     getObjectUrl: getObjectUrl,
     getAuth: getAuth,
     getV4Auth: getV4Auth,
 };
 
-function warnOldApi(apiName, fn, proto) {
+// 兼容老的方法名
+function warnOldApi(apiName, apiFn, proto) {
     util.each(['Cors', 'Acl'], function (suffix) {
         if (apiName.slice(-suffix.length) === suffix) {
             var oldName = apiName.slice(0, -suffix.length) + suffix.toUpperCase();
-            var apiFn = util.apiWrapper(apiName, fn);
-            var warned = false;
+            var warned = false; // 只提示一次
             proto[oldName] = function () {
                 !warned && console.warn('warning: cos.' + oldName + ' has been deprecated. Please Use cos.' + apiName + ' instead.');
                 warned = true;
-                apiFn.apply(this, arguments);
+                return apiFn.apply(this, arguments);
             };
         }
     });
 }
 
+// 初始化模块
 module.exports.init = function (COS, task) {
+    // 转换为队列方法
     task.transferToTaskMethod(API_MAP, 'putObject');
+    // 统一包装请求方法
     util.each(API_MAP, function (fn, apiName) {
         COS.prototype[apiName] = util.apiWrapper(apiName, fn);
         warnOldApi(apiName, fn, COS.prototype);
     });
-};
-
-// 需要进行 promisify 的 API
-module.exports.getPromisifyApis = function() {
-    var keys = Object.keys(API_MAP);
-    var ignoreKeys = ['getObjectUrl', 'getAuth', 'getV4Auth'];
-    return util.filter(keys, function(key) {
-        return ignoreKeys.indexOf(key) === -1;
-    });
+    // 工具方法，直接继承
+    util.extend(COS.prototype, UTIL_APIS);
 };

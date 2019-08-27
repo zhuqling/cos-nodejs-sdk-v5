@@ -1189,14 +1189,12 @@ var API_MAP = {
     sliceCopyFile: sliceCopyFile,
 };
 
+// 初始化模块
 module.exports.init = function (COS, task) {
+    // 转换为队列方法
     task.transferToTaskMethod(API_MAP, 'sliceUploadFile');
+    // 统一包装请求方法
     util.each(API_MAP, function (fn, apiName) {
-        COS.prototype[apiName] = util.apiWrapper(apiName, fn);
+        COS.prototype[apiName] = util.apiWrapper(apiName, fn, true);
     });
-};
-
-// 需要进行 promisify 的 API
-module.exports.getPromisifyApis = function() {
-    return Object.keys(API_MAP);
 };

@@ -265,32 +265,6 @@ var uuid = function () {
     return (S4() + S4() + "-" + S4() + "-" + S4() + "-" + S4() + "-" + S4() + S4() + S4());
 };
 
-// 将 callback 形式转为返回原生 Promise 对象
-var promisify = function(func) {
-    return function() {
-        var _this = this;
-        var args = Array.prototype.slice.call(arguments, 0);
-        return new Promise(function(resolve, reject) {
-            var _callback = function(err, data) {
-                if(err) {
-                    reject(err);
-                } else {
-                    resolve(data);
-                }
-            };
-            args.push(_callback);
-            func.apply(_this, args);
-        });
-    };
-};
-
-var promisifyApis = function(COS, apis) {
-    var target = COS.prototype;
-    each(apis, function(api) {
-        target[api] = promisify(target[api]);
-    });
-};
-
 var hasMissingParams = function (apiName, params) {
     var Bucket = params.Bucket;
     var Region = params.Region;
@@ -312,77 +286,142 @@ var formatParams = function (apiName, params) {
     params = extend({}, params);
 
     // 统一处理 Headers
-    if (apiName !== 'getAuth' && apiName !== 'getV4Auth' && apiName !== 'getObjectUrl') {
-        var Headers = params.Headers || {};
-        if (params && typeof params === 'object') {
-            (function () {
-                for (var key in params) {
-                    if (params.hasOwnProperty(key) && key.indexOf('x-cos-') > -1) {
-                        Headers[key] = params[key];
-                    }
+    var Headers = params.Headers || {};
+    if (params && typeof params === 'object') {
+        (function () {
+            for (var key in params) {
+                if (params.hasOwnProperty(key) && key.indexOf('x-cos-') > -1) {
+                    Headers[key] = params[key];
                 }
-            })();
+            }
+        })();
 
-            var headerMap = {
-                // params headers
-                'x-cos-mfa': 'MFA',
-                'Content-MD5': 'ContentMD5',
-                'Content-Length': 'ContentLength',
-                'Content-Type': 'ContentType',
-                'Expect': 'Expect',
-                'Expires': 'Expires',
-                'Cache-Control': 'CacheControl',
-                'Content-Disposition': 'ContentDisposition',
-                'Content-Encoding': 'ContentEncoding',
-                'Range': 'Range',
-                'If-Modified-Since': 'IfModifiedSince',
-                'If-Unmodified-Since': 'IfUnmodifiedSince',
-                'If-Match': 'IfMatch',
-                'If-None-Match': 'IfNoneMatch',
-                'x-cos-copy-source': 'CopySource',
-                'x-cos-copy-source-Range': 'CopySourceRange',
-                'x-cos-metadata-directive': 'MetadataDirective',
-                'x-cos-copy-source-If-Modified-Since': 'CopySourceIfModifiedSince',
-                'x-cos-copy-source-If-Unmodified-Since': 'CopySourceIfUnmodifiedSince',
-                'x-cos-copy-source-If-Match': 'CopySourceIfMatch',
-                'x-cos-copy-source-If-None-Match': 'CopySourceIfNoneMatch',
-                'x-cos-acl': 'ACL',
-                'x-cos-grant-read': 'GrantRead',
-                'x-cos-grant-write': 'GrantWrite',
-                'x-cos-grant-full-control': 'GrantFullControl',
-                'x-cos-grant-read-acp': 'GrantReadAcp',
-                'x-cos-grant-write-acp': 'GrantWriteAcp',
-                'x-cos-storage-class': 'StorageClass',
-                // SSE-C
-                'x-cos-server-side-encryption-customer-algorithm': 'SSECustomerAlgorithm',
-                'x-cos-server-side-encryption-customer-key': 'SSECustomerKey',
-                'x-cos-server-side-encryption-customer-key-MD5': 'SSECustomerKeyMD5',
-                // SSE-COS、SSE-KMS
-                'x-cos-server-side-encryption': 'ServerSideEncryption',
-                'x-cos-server-side-encryption-cos-kms-key-id': 'SSEKMSKeyId',
-                'x-cos-server-side-encryption-context': 'SSEContext',
-            };
-            util.each(headerMap, function (paramKey, headerKey) {
-                if (params[paramKey] !== undefined) {
-                    Headers[headerKey] = params[paramKey];
-                }
-            });
+        var headerMap = {
+            // params headers
+            'x-cos-mfa': 'MFA',
+            'Content-MD5': 'ContentMD5',
+            'Content-Length': 'ContentLength',
+            'Content-Type': 'ContentType',
+            'Expect': 'Expect',
+            'Expires': 'Expires',
+            'Cache-Control': 'CacheControl',
+            'Content-Disposition': 'ContentDisposition',
+            'Content-Encoding': 'ContentEncoding',
+            'Range': 'Range',
+            'If-Modified-Since': 'IfModifiedSince',
+            'If-Unmodified-Since': 'IfUnmodifiedSince',
+            'If-Match': 'IfMatch',
+            'If-None-Match': 'IfNoneMatch',
+            'x-cos-copy-source': 'CopySource',
+            'x-cos-copy-source-Range': 'CopySourceRange',
+            'x-cos-metadata-directive': 'MetadataDirective',
+            'x-cos-copy-source-If-Modified-Since': 'CopySourceIfModifiedSince',
+            'x-cos-copy-source-If-Unmodified-Since': 'CopySourceIfUnmodifiedSince',
+            'x-cos-copy-source-If-Match': 'CopySourceIfMatch',
+            'x-cos-copy-source-If-None-Match': 'CopySourceIfNoneMatch',
+            'x-cos-acl': 'ACL',
+            'x-cos-grant-read': 'GrantRead',
+            'x-cos-grant-write': 'GrantWrite',
+            'x-cos-grant-full-control': 'GrantFullControl',
+            'x-cos-grant-read-acp': 'GrantReadAcp',
+            'x-cos-grant-write-acp': 'GrantWriteAcp',
+            'x-cos-storage-class': 'StorageClass',
+            // SSE-C
+            'x-cos-server-side-encryption-customer-algorithm': 'SSECustomerAlgorithm',
+            'x-cos-server-side-encryption-customer-key': 'SSECustomerKey',
+            'x-cos-server-side-encryption-customer-key-MD5': 'SSECustomerKeyMD5',
+            // SSE-COS、SSE-KMS
+            'x-cos-server-side-encryption': 'ServerSideEncryption',
+            'x-cos-server-side-encryption-cos-kms-key-id': 'SSEKMSKeyId',
+            'x-cos-server-side-encryption-context': 'SSEContext',
+        };
+        util.each(headerMap, function (paramKey, headerKey) {
+            if (params[paramKey] !== undefined) {
+                Headers[headerKey] = params[paramKey];
+            }
+        });
 
-            params.Headers = clearKey(Headers);
-        }
+        params.Headers = clearKey(Headers);
     }
 
     return params;
 };
 
+var checkParamsAndFixAppId = function (apiName, params) {
+    if (apiName !== 'getService' && apiName !== 'abortUploadTask') {
+        // 判断参数是否完整
+        var missingResult = hasMissingParams(apiName, params);
+        if (missingResult) {
+            return 'missing param ' + missingResult;
+        }
+        // 判断 region 格式
+        if (params.Region) {
+            if (params.Region.indexOf('cos.') > -1) {
+                return 'param Region should not be start with "cos."';
+            } else if (!/^([a-z\d-]+)$/.test(params.Region)) {
+                return 'Region format error.';
+            }
+            // 判断 region 格式
+            if (!this.options.CompatibilityMode && params.Region.indexOf('-') === -1 && params.Region !== 'yfb' && params.Region !== 'default') {
+                console.warn('warning: param Region format error, find help here: https://cloud.tencent.com/document/product/436/6224');
+            }
+        }
+        // 兼容不带 AppId 的 Bucket
+        if (params.Bucket) {
+            if (!/^([a-z\d-]+)-(\d+)$/.test(params.Bucket)) {
+                if (params.AppId) {
+                    params.Bucket = params.Bucket + '-' + params.AppId;
+                } else if (this.options.AppId) {
+                    params.Bucket = params.Bucket + '-' + this.options.AppId;
+                } else {
+                    return 'Bucket should format as "test-1250000000".';
+                }
+            }
+            if (params.AppId) {
+                console.warn('warning: AppId has been deprecated, Please put it at the end of parameter Bucket(E.g Bucket:"test-1250000000" ).');
+                delete params.AppId;
+            }
+        }
+        // 如果 Key 是 / 开头，强制去掉第一个 /
+        if (!this.options.UseRawKey && params.Key && params.Key.substr(0, 1) === '/') {
+            params.Key = params.Key.substr(1);
+        }
+    }
+    return false;
+};
+
+
+// 将 callback 形式转为返回原生 Promise 对象
+var promisify = function(func) {
+    return function() {
+        var self = this;
+        var args = Array.prototype.slice.call(arguments, 0);
+        var lastArg = args[args.length - 1];
+        if (typeof lastArg === 'function') {
+            return func.apply(self, args);
+        } else {
+            return new Promise(function(resolve, reject) {
+                args.push(function(err, data) {
+                    err ? reject(err) : resolve(data);
+                });
+                func.apply(self, args);
+            });
+        }
+    };
+};
+
+// 对所有请求方法包装一层
 var apiWrapper = function (apiName, apiFn) {
-    return function (params, callback) {
+
+    var api = function (params, callback) {
+        var self = this;
 
         // 处理参数
         if (typeof params === 'function') {
             callback = params;
             params = {};
         }
+        callback = callback || noop;
 
         // 整理参数格式
         params = formatParams(apiName, params);
@@ -395,58 +434,26 @@ var apiWrapper = function (apiName, apiFn) {
             }
             return result;
         };
-        var _callback = function (err, data) {
-            callback && callback(formatResult(err), formatResult(data));
+        var cb = function (err, data) {
+            callback(formatResult(err), formatResult(data));
         };
 
-        if (apiName !== 'getService' && apiName !== 'abortUploadTask') {
-            // 判断参数是否完整
-            var missingResult;
-            if (missingResult = hasMissingParams(apiName, params)) {
-                _callback({error: 'missing param ' + missingResult});
-                return;
-            }
-            // 判断 region 格式
-            if (params.Region) {
-                if (params.Region.indexOf('cos.') > -1) {
-                    _callback({error: 'param Region should not be start with "cos."'});
-                    return;
-                } else if (!/^([a-z\d-]+)$/.test(params.Region)) {
-                    _callback({error: 'Region format error.'});
-                    return;
-                }
-                // 判断 region 格式
-                if (!this.options.CompatibilityMode && params.Region.indexOf('-') === -1 && params.Region !== 'yfb' && params.Region !== 'default') {
-                    console.warn('warning: param Region format error, find help here: https://cloud.tencent.com/document/product/436/6224');
-                }
-            }
-            // 兼容不带 AppId 的 Bucket
-            if (params.Bucket) {
-                if (!/^([a-z\d-]+)-(\d+)$/.test(params.Bucket)) {
-                    if (params.AppId) {
-                        params.Bucket = params.Bucket + '-' + params.AppId;
-                    } else if (this.options.AppId) {
-                        params.Bucket = params.Bucket + '-' + this.options.AppId;
-                    } else {
-                        _callback({error: 'Bucket should format as "test-1250000000".'});
-                        return;
-                    }
-                }
-                if (params.AppId) {
-                    console.warn('warning: AppId has been deprecated, Please put it at the end of parameter Bucket(E.g Bucket:"test-1250000000" ).');
-                    delete params.AppId;
-                }
-            }
-            // 如果 Key 是 / 开头，强制去掉第一个 /
-            if (!this.options.UseRawKey && params.Key && params.Key.substr(0, 1) === '/') {
-                params.Key = params.Key.substr(1);
-            }
+        // 检查参数错误
+        var checkError = checkParamsAndFixAppId.call(self, apiName, params);
+        if (checkError) {
+            cb({error: checkError});
+            return;
         }
-        var res = apiFn.call(this, params, _callback);
-        if (apiName === 'getAuth' || apiName === 'getV4Auth' || apiName === 'getObjectUrl') {
-            return res;
-        }
-    }
+
+        // 执行函数和返回值
+        apiFn.call(self, params, cb);
+
+    };
+
+    // 处理成 Promise 格式
+    api = promisify(api);
+
+    return api;
 };
 
 var throttleOnProgress = function (total, onProgress) {
@@ -547,6 +554,64 @@ var getSkewTime = function (offset) {
     return Date.now() + (offset || 0);
 };
 
+var fileSlice = function (FilePath, start, end, callback) {
+    if (FilePath) {
+        callback(fs.createReadStream(FilePath, {start: start, end: end - 1}));
+    } else {
+        callback(null);
+    }
+};
+var getFileUUID = function (FileStat, ChunkSize) {
+    if (FileStat && FileStat.FilePath && FileStat.size && FileStat.ctime && FileStat.mtime && ChunkSize) {
+        return md5([FileStat.FilePath].join('::')) + '-' + md5([FileStat.size, FileStat.ctime, FileStat.mtime, ChunkSize].join('::'));
+    } else {
+        return null;
+    }
+};
+var getBodyMd5 = function (UploadCheckContentMd5, Body, callback) {
+    callback = callback || noop;
+    if (UploadCheckContentMd5) {
+        if (Body instanceof Buffer || typeof Body === 'string') {
+            callback(md5(Body));
+        } else {
+            callback();
+        }
+    } else {
+        callback();
+    }
+};
+
+var localStorage = (function () {
+    try {
+        configStore = new ConfigStore('cos-nodejs-sdk-v5-storage');
+    } catch (e) {
+    }
+    var map = {};
+    var update = function (key, val) {
+        if (map.hasOwnProperty(key)) {
+            map[key] = val;
+        } else {
+            map[key] = val;
+            setTimeout(function () {
+                if (!configStore) return;
+                if (map[key] === undefined) {
+                    configStore.delete(key);
+                } else {
+                    configStore.set(key, map[key]);
+                }
+                delete map[key];
+            }, 300);
+        }
+    };
+    return {
+        getItem: function (key) {
+            return configStore && configStore.get(key);
+        },
+        setItem: update,
+        removeItem: update,
+    };
+})();
+
 var util = {
     noop: noop,
     formatParams: formatParams,
@@ -571,66 +636,11 @@ var util = {
     getSkewTime: getSkewTime,
     getAuth: getAuth,
     getV4Auth: getV4Auth,
-    promisify: promisify,
-    promisifyApis: promisifyApis,
+    fileSlice: fileSlice,
+    getFileUUID: getFileUUID,
+    getBodyMd5: getBodyMd5,
+    localStorage: localStorage,
     isBrowser: false,
-};
-
-(function () {
-    try {
-        configStore = new ConfigStore('cos-nodejs-sdk-v5-storage');
-    } catch (e) {
-    }
-    var map = {};
-    var update = function (key, val) {
-        if (map.hasOwnProperty(key)) {
-            map[key] = val;
-        } else {
-            map[key] = val;
-            setTimeout(function () {
-                if (!configStore) return;
-                if (map[key] === undefined) {
-                    configStore.delete(key);
-                } else {
-                    configStore.set(key, map[key]);
-                }
-                delete map[key];
-            }, 300);
-        }
-    };
-    util.localStorage = {
-        getItem: function (key) {
-            return configStore && configStore.get(key);
-        },
-        setItem: update,
-        removeItem: update,
-    };
-})();
-util.fileSlice = function (FilePath, start, end, callback) {
-    if (FilePath) {
-        callback(fs.createReadStream(FilePath, {start: start, end: end - 1}));
-    } else {
-        callback(null);
-    }
-};
-util.getFileUUID = function (FileStat, ChunkSize) {
-    if (FileStat && FileStat.FilePath && FileStat.size && FileStat.ctime && FileStat.mtime && ChunkSize) {
-        return util.md5([FileStat.FilePath].join('::')) + '-' + util.md5([FileStat.size, FileStat.ctime, FileStat.mtime, ChunkSize].join('::'));
-    } else {
-        return null;
-    }
-};
-util.getBodyMd5 = function (UploadCheckContentMd5, Body, callback) {
-    callback = callback || noop;
-    if (UploadCheckContentMd5) {
-        if (Body instanceof Buffer || typeof Body === 'string') {
-            callback(util.md5(Body));
-        } else {
-            callback();
-        }
-    } else {
-        callback();
-    }
 };
 
 module.exports = util;
