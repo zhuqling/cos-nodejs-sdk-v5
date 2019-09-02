@@ -784,12 +784,8 @@ group('getObject()', function () {
 
     test('getObject() stream', function (done, assert) {
         var key = '1.txt';
-        var objectContent = Buffer.from([]);
-        var outputStream = new Writable({
-            write: function (chunk, encoding, callback) {
-                objectContent = Buffer.concat([objectContent, chunk]);
-            }
-        });
+        var tempFilePath = path.resolve(__dirname, 'getObjectTemp.' + key);
+        var outputStream = fs.createWriteStream(tempFilePath);
         var content = Date.now().toString(36);
         cos.putObject({
             Bucket: config.Bucket,
@@ -804,9 +800,10 @@ group('getObject()', function () {
                 Output: outputStream
             }, function (err, data) {
                 if (err) throw err;
-                objectContent = objectContent.toString();
+                var objectContent = fs.readFileSync(tempFilePath, 'utf8');
                 assert.ok(data.headers['content-length'] === '' + content.length);
                 assert.ok(objectContent === content);
+                fs.unlinkSync(tempFilePath);
                 cos.headObject({
                     Bucket: config.Bucket,
                     Region: config.Region,
@@ -815,6 +812,44 @@ group('getObject()', function () {
                     assert.ok(!err);
                     done();
                 });
+            });
+        });
+    });
+});
+
+group('getObjectStream()', function () {
+    test('getObjectStream()', function (done, assert) {
+        var key = '1.txt';
+        var content = Date.now().toString(36);
+        var tempFilePath = path.resolve(__dirname, 'getObjectStreamTemp.' + key);
+        var outputStream = fs.createWriteStream(tempFilePath);
+        cos.putObject({
+            Bucket: config.Bucket,
+            Region: config.Region,
+            Key: key,
+            Body: Buffer.from(content)
+        }, function (err, data) {
+            cos.getObjectStream({
+                Bucket: config.Bucket,
+                Region: config.Region,
+                Key: key
+            }, function (err, data) {
+                if (err) throw err;
+
+                outputStream.on('close', function() {
+                    var objectContent = fs.readFileSync(tempFilePath, 'utf8');
+                    assert.ok(data.headers['content-length'] === '' + content.length);
+                    assert.ok(objectContent === content);
+                    fs.unlinkSync(tempFilePath);
+                    done();
+                });
+
+                outputStream.on('error', function(err) {
+                    assert.ok(!err);
+                    done();
+                });
+
+                data.stream.pipe(outputStream);
             });
         });
     });

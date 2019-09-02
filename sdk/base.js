@@ -1114,7 +1114,7 @@ function getObject(params, callback) {
         outputStream: outputStream,
         onDownloadProgress: onDownloadProgress,
     }, function (err, data) {
-        onDownloadProgress(null, true);
+        // onDownloadProgress(null, true);
         if (err) {
             var statusCode = err.statusCode;
             if (params.Headers['If-Modified-Since'] && statusCode && statusCode === 304) {
@@ -1141,7 +1141,111 @@ function getObject(params, callback) {
         });
         callback(null, result);
     });
+}
 
+/**
+ * 获取 object 下载的读文件流对象
+ * @param  {Object}  params                                 参数对象，必须
+ *     @param  {String}  params.Bucket                      Bucket名称，必须
+ *     @param  {String}  params.Region                      地域名称，必须
+ *     @param  {String}  params.Key                         文件名称，必须
+ *     @param  {String}  params.IfModifiedSince             当Object在指定时间后被修改，则返回对应Object元信息，否则返回304，非必须
+ *     @param  {String}  params.IfUnmodifiedSince           如果文件修改时间早于或等于指定时间，才返回文件内容。否则返回 412 (precondition failed)，非必须
+ *     @param  {String}  params.IfMatch                     当 ETag 与指定的内容一致，才返回文件。否则返回 412 (precondition failed)，非必须
+ *     @param  {String}  params.IfNoneMatch                 当 ETag 与指定的内容不一致，才返回文件。否则返回304 (not modified)，非必须
+ *     @param  {String}  params.ResponseContentType         设置返回头部中的 Content-Type 参数，非必须
+ *     @param  {String}  params.ResponseContentLanguage     设置返回头部中的 Content-Language 参数，非必须
+ *     @param  {String}  params.ResponseExpires             设置返回头部中的 Content-Expires 参数，非必须
+ *     @param  {String}  params.ResponseCacheControl        设置返回头部中的 Cache-Control 参数，非必须
+ *     @param  {String}  params.ResponseContentDisposition  设置返回头部中的 Content-Disposition 参数，非必须
+ *     @param  {String}  params.ResponseContentEncoding     设置返回头部中的 Content-Encoding 参数，非必须
+ * @param  {Function}  callback                             回调函数，必须
+ * @param  {Object}  err                                    请求失败的错误，如果请求成功，则为空。https://cloud.tencent.com/document/product/436/7730
+ * @param  {Object}  data                                   为对应的 object 流对象，包括读文件流 stream，头部信息 headers, 状态码 statusCode
+ */
+function getObjectStream(params, callback) {
+    var reqParams = {};
+
+    reqParams['response-content-type'] = params['ResponseContentType'];
+    reqParams['response-content-language'] = params['ResponseContentLanguage'];
+    reqParams['response-expires'] = params['ResponseExpires'];
+    reqParams['response-cache-control'] = params['ResponseCacheControl'];
+    reqParams['response-content-disposition'] = params['ResponseContentDisposition'];
+    reqParams['response-content-encoding'] = params['ResponseContentEncoding'];
+
+    var self = this;
+
+    var onProgress = params.onProgress;
+    var onDownloadProgress = (function () {
+        var time0 = Date.now();
+        var size0 = 0;
+        var FinishSize = 0;
+        var FileSize = 0;
+        var progressTimer;
+        var update = function () {
+            progressTimer = 0;
+            if (onProgress && (typeof onProgress === 'function')) {
+                var time1 = Date.now();
+                var speed = parseInt((FinishSize - size0) / ((time1 - time0) / 1000) * 100) / 100 || 0;
+                var percent = parseInt(FinishSize / FileSize * 100) / 100 || 0;
+                time0 = time1;
+                size0 = FinishSize;
+                try {
+                    onProgress({
+                        loaded: FinishSize,
+                        total: FileSize,
+                        speed: speed,
+                        percent: percent
+                    });
+                } catch (e) {
+                }
+            }
+        };
+        return function (info, immediately) {
+            if (info && info.loaded) {
+                FinishSize = info.loaded;
+                FileSize = info.total;
+            }
+            if (immediately) {
+                clearTimeout(progressTimer);
+                update();
+            } else {
+                if (progressTimer) return;
+                progressTimer = setTimeout(update, self.options.ProgressInterval || 1000);
+            }
+        };
+    })();
+
+    // 如果用户自己传入了 output
+    submitRequest.call(this, {
+        Action: 'name/cos:GetObject',
+        method: 'GET',
+        Bucket: params.Bucket,
+        Region: params.Region,
+        Key: params.Key,
+        VersionId: params.VersionId,
+        headers: params.Headers,
+        qs: reqParams,
+        rawBody: true,
+        onDownloadProgress: onDownloadProgress,
+        retryDisabled: true,
+        callbackStream: true
+    }, function (err, data) {
+        if (err) {
+            var statusCode = err.statusCode;
+            if (params.Headers['If-Modified-Since'] && statusCode && statusCode === 304) {
+                return callback({
+                    NotModified: true
+                });
+            }
+            return callback(err);
+        }
+        return callback(null, {
+            stream: data.stream,
+            headers: data.headers,
+            statusCode: data.statusCode
+        });
+    });
 }
 
 /**
@@ -2335,6 +2439,7 @@ function allowRetry(err) {
 }
 
 // 获取签名并发起请求
+// 获取签名并发起请求
 function submitRequest(params, callback) {
     var self = this;
 
@@ -2369,7 +2474,7 @@ function submitRequest(params, callback) {
         }, function (err, AuthData) {
             params.AuthData = AuthData;
             _submitRequest.call(self, params, function (err, data) {
-                if (err && tryIndex < 2 && (oldClockOffset !== self.options.SystemClockOffset || allowRetry.call(self, err))) {
+                if (!params.retryDisabled && err && tryIndex < 2 && (oldClockOffset !== self.options.SystemClockOffset || allowRetry.call(self, err))) {
                     if (params.headers) {
                         delete params.headers.Authorization;
                         delete params.headers['token'];
@@ -2481,7 +2586,7 @@ function _submitRequest(params, callback) {
             data = util.extend(data || {}, attrs);
             callback(null, data);
         }
-        if (sender) {
+        if (sender && !params.callbackStream) {
             sender.removeAllListeners && sender.removeAllListeners();
             sender = null;
         }
@@ -2517,44 +2622,56 @@ function _submitRequest(params, callback) {
         var chunkList = [];
         var statusCode = response.statusCode;
         var statusSuccess = Math.floor(statusCode / 100) === 2; // 200 202 204 206
-        if (statusSuccess && params.outputStream) {
+
+        var dataHandler = function (chunk) {
+            chunkList.push(chunk);
+        };
+        var endHandler = function () {
+            var json;
+            try {
+                var body = Buffer.concat(chunkList);
+            } catch (e) {
+                cb({error: e});
+                return;
+            }
+            var bodyStr = body.toString();
+            if (statusSuccess) {
+                if (rawBody) { // 不对 body 进行转换，body 直接挂载返回
+                    cb(null, {body: body});
+                } else if (body.length) {
+                    json = xml2json(body.toString());
+                    if (json && json.Error) {
+                        cb({error: json.Error});
+                    } else {
+                        cb(null, json);
+                    }
+                } else {
+                    cb(null, {});
+                }
+            } else {
+                bodyStr && (json = xml2json(bodyStr));
+                cb({error: json && json.Error || response.statusMessage || 'statusCode error'});
+            }
+            chunkList = null;
+        };
+
+        // 如果是要求返回流
+        if(params.callbackStream) {
+            if(statusSuccess) {
+                // 成功则直接返回请求流
+                cb(null, { stream: sender });
+            } else {
+                // 失败则读取 body 内容，转成 json 格式返回
+                sender.on('data', dataHandler);
+                sender.on('end', endHandler);
+            }
+        } else if (statusSuccess && params.outputStream) {
             sender.on('end', function () {
                 cb(null, {});
             });
         } else if (responseContentLength >= process.binding('buffer').kMaxLength && opt.method !== 'HEAD') {
             cb({error: 'file size large than ' + process.binding('buffer').kMaxLength + ', please use "Output" Stream to getObject.'});
         } else {
-            var dataHandler = function (chunk) {
-                chunkList.push(chunk);
-            };
-            var endHandler = function () {
-                var json;
-                try {
-                    var body = Buffer.concat(chunkList);
-                } catch (e) {
-                    cb({error: e});
-                    return;
-                }
-                var bodyStr = body.toString();
-                if (statusSuccess) {
-                    if (rawBody) { // 不对 body 进行转换，body 直接挂载返回
-                        cb(null, {body: body});
-                    } else if (body.length) {
-                        json = xml2json(body.toString());
-                        if (json && json.Error) {
-                            cb({error: json.Error});
-                        } else {
-                            cb(null, json);
-                        }
-                    } else {
-                        cb(null, {});
-                    }
-                } else {
-                    bodyStr && (json = xml2json(bodyStr));
-                    cb({error: json && json.Error || response.statusMessage || 'statusCode error'});
-                }
-                chunkList = null;
-            };
             sender.on('data', dataHandler);
             sender.on('end', endHandler);
         }
@@ -2622,6 +2739,11 @@ function _submitRequest(params, callback) {
                     percent: percent,
                 });
             });
+
+            // 结束时，触发一次 onDownloadProgress，销毁节流的定时器
+            sender.on('end', function() {
+                params.onDownloadProgress(null, true);
+            });
         });
     }
 
@@ -2677,6 +2799,7 @@ var API_MAP = {
 
     // Object 相关方法
     getObject: getObject,
+    getObjectStream: getObjectStream,
     headObject: headObject,
     listObjectVersions: listObjectVersions,
     putObject: putObject,

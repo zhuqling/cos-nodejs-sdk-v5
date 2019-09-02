@@ -523,6 +523,27 @@ function getObject() {
     });
 }
 
+function getObjectStream() {
+    var filepath1 = path.resolve(__dirname, '1mb.out1.zip');
+    var outputStream = fs.createWriteStream(filepath1);
+
+    cos.getObjectStream({
+        Bucket: config.Bucket, // Bucket 格式：test-1250000000
+        Region: config.Region,
+        Key: '1mb.zip',
+        onProgress: function (progressData) {
+            console.log(JSON.stringify(progressData));
+        }
+    }, function (err, data) {
+        if(err) {
+            console.log(err);
+        } else {
+            data.stream.pipe(outputStream);
+            console.log({ headers: data.headers });
+        }
+    });
+}
+
 function headObject() {
     cos.headObject({
         Bucket: config.Bucket, // Bucket 格式：test-1250000000
@@ -776,6 +797,7 @@ getService();
 // putObject();
 // putObjectCopy();
 // getObject();
+// getObjectStream();
 // headObject();
 // putObjectAcl();
 // getObjectAcl();
