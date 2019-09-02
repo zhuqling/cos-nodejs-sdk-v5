@@ -51,7 +51,7 @@ var initTask = function (cos) {
              i < queue.length && // 大于队列才清理
              queue.length > cos.options.UploadQueueSize // 如果还太多，才继续清理
             ;) {
-            var isActive = queue[i].state === 'waiting' || queue[i].state === 'checking' || queue[i].state === 'uploading';
+            var isActive = queue[i].state === 'waiting' || queue[i].state === 'checking' || queue[i].state === 'uploading' || queue[i].state === 'paused';
             if (!queue[i] || !isActive) {
                 tasks[queue[i].id] && (delete tasks[queue[i].id]);
                 queue.splice(i, 1);
