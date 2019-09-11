@@ -2074,3 +2074,204 @@ group('deleteMultipleObject Key 带中文字符', function () {
         });
     });
 });
+
+group('BucketLogging', function () {
+    var TargetBucket = 'bucket-logging' + Date.now().toString(36) + '-' + AppId;
+    var TargetPrefix = 'bucket-logging-prefix' + Date.now().toString(36) + '/';
+    var BucketLoggingStatus = {
+        LoggingEnabled: {
+            TargetBucket: TargetBucket,
+            TargetPrefix: TargetPrefix
+        }
+    };
+
+    // 创建新 Bucket
+    before(function (done) {
+        cos.putBucket({
+            Bucket: TargetBucket,
+            Region: config.Region,
+        }, done);
+    });
+
+    // 删除新 Bucket
+    after(function (done) {
+        cos.deleteBucket({
+            Bucket: TargetBucket,
+            Region: config.Region,
+        }, done);
+    });
+
+    test('putBucketLogging(), getBucketLogging()', function (done, assert) {
+        cos.putBucketLogging({
+            Bucket: config.Bucket,
+            Region: config.Region,
+            BucketLoggingStatus: BucketLoggingStatus
+        }, function(err, data) {
+            assert.ok(!err);
+
+            cos.getBucketLogging({
+                Bucket: config.Bucket,
+                Region: config.Region
+            }, function (err, data) {
+                assert.ok(comparePlainObject(BucketLoggingStatus, data.BucketLoggingStatus));
+                done();
+            });
+        });
+    });
+
+    test('putBucketLogging() 删除 logging 配置', function (done, assert) {
+        cos.putBucketLogging({
+            Bucket: config.Bucket,
+            Region: config.Region,
+            BucketLoggingStatus: ''
+        }, function(err, data) {
+            assert.ok(!err);
+
+            cos.getBucketLogging({
+                Bucket: config.Bucket,
+                Region: config.Region
+            }, function (err, data) {
+                assert.ok(data.BucketLoggingStatus === '');
+                done();
+            });
+        });
+    });
+});
+
+group('BucketInventory', function () {
+    var TargetBucket = 'bucket-inventory' + Date.now().toString(36) + '-' + AppId;
+
+    // 创建新 Bucket
+    before(function (done) {
+        cos.putBucket({
+            Bucket: TargetBucket,
+            Region: config.Region
+        }, done);
+    });
+
+    // 删除新 Bucket
+    after(function (done) {
+        cos.deleteBucket({
+            Bucket: TargetBucket,
+            Region: config.Region
+        }, done);
+    });
+
+    var InventoryConfiguration = {
+        Id: 'inventory_test',
+        IsEnabled: 'true',
+        Destination: {
+            COSBucketDestination: {
+                Format: 'CSV',
+                AccountId: config.AccountId,
+                Bucket: 'qcs::cos:' + config.Region + '::' + TargetBucket,
+                Prefix: 'inventory_prefix_1',
+                Encryption: {
+                    SSECOS: ''
+                }
+            }
+        },
+        Schedule: {
+            Frequency: 'Daily'
+        },
+        Filter: {
+            Prefix: 'myPrefix'
+        },
+        IncludedObjectVersions: 'All',
+        OptionalFields: [
+            'Size'
+        ]
+    };
+
+    var InventoryConfigurationNoEncryption = {
+        Id: 'inventory_test',
+        IsEnabled: 'true',
+        Destination: {
+            COSBucketDestination: {
+                Format: 'CSV',
+                AccountId: config.AccountId,
+                Bucket: 'qcs::cos:' + config.Region + '::' + TargetBucket,
+                Prefix: 'inventory_prefix_1'
+            }
+        },
+        Schedule: {
+            Frequency: 'Daily'
+        },
+        Filter: {
+            Prefix: 'myPrefix'
+        },
+        IncludedObjectVersions: 'All',
+        OptionalFields: [
+            'Size'
+        ]
+    };
+
+    test('putBucketInventory(), getBucketInventory()', function (done, assert) {
+        cos.putBucketInventory({
+            Bucket: config.Bucket,
+            Region: config.Region,
+            Id: InventoryConfiguration.Id,
+            InventoryConfiguration: InventoryConfiguration
+        }, function(err, data) {
+            assert.ok(!err);
+
+            cos.getBucketInventory({
+                Bucket: config.Bucket,
+                Region: config.Region,
+                Id: InventoryConfiguration.Id
+            }, function(err, data) {
+                assert.ok(comparePlainObject(InventoryConfiguration, data.InventoryConfiguration));
+                done();
+            });
+        });
+    });
+
+    test('listBucketInventory()', function (done, assert) {
+        cos.listBucketInventory({
+            Bucket: config.Bucket,
+            Region: config.Region
+        }, function (err, data) {
+            assert.ok(comparePlainObject(InventoryConfiguration, data.InventoryConfigurations[0]));
+            assert.ok(data.IsTruncated === 'false' || data.IsTruncated === 'true');
+            done();
+        });
+    });
+
+    test('putBucketInventory() 不设置 SSECOS', function (done, assert) {
+        cos.putBucketInventory({
+            Bucket: config.Bucket,
+            Region: config.Region,
+            Id: InventoryConfigurationNoEncryption.Id,
+            InventoryConfiguration: InventoryConfigurationNoEncryption
+        }, function(err, data) {
+            assert.ok(!err);
+
+            cos.getBucketInventory({
+                Bucket: config.Bucket,
+                Region: config.Region,
+                Id: InventoryConfigurationNoEncryption.Id
+            }, function (err, data) {
+                assert.ok(comparePlainObject(InventoryConfigurationNoEncryption, data.InventoryConfiguration));
+                done();
+            });
+        });
+    });
+
+    test('deleteBucketInventory()', function (done, assert) {
+        cos.deleteBucketInventory({
+            Bucket: config.Bucket,
+            Region: config.Region,
+            Id: InventoryConfiguration.Id
+        }, function(err, data) {
+            assert.ok(!err);
+            cos.getBucketInventory({
+                Bucket: config.Bucket,
+                Region: config.Region,
+                Id: InventoryConfiguration.Id
+            }, function (err, data) {
+                assert.ok(err && err.statusCode === 404);
+                done();
+            });
+        });
+    });
+});

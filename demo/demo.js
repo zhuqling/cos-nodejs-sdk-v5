@@ -557,6 +557,111 @@ function deleteBucketDomain() {
     });
 }
 
+function putBucketLogging() {
+    var AppId = config.Bucket.substr(config.Bucket.lastIndexOf('-') + 1);
+    cos.putBucketLogging({
+        Bucket: config.Bucket, // Bucket 格式：test-1250000000
+        Region: config.Region,
+        BucketLoggingStatus: {
+            LoggingEnabled: {
+                TargetBucket: 'bucket-logging-' + AppId,
+                TargetPrefix: 'logging'
+            }
+        }
+    }, function (err, data) {
+        console.log(err || data);
+    });
+}
+
+function getBucketLogging() {
+    cos.getBucketLogging({
+        Bucket: config.Bucket, // Bucket 格式：test-1250000000
+        Region: config.Region
+    }, function (err, data) {
+        console.log(err || data);
+    });
+}
+
+function deleteBucketLogging() {
+    cos.putBucketLogging({
+        Bucket: config.Bucket, // Bucket 格式：test-1250000000
+        Region: config.Region,
+        BucketLoggingStatus: ''
+    }, function (err, data) {
+        console.log(err || data);
+    });
+}
+
+function putBucketInventory() {
+    var AppId = config.Bucket.substr(config.Bucket.lastIndexOf('-') + 1);
+    cos.putBucketInventory({
+        Bucket: config.Bucket, // Bucket 格式：test-1250000000
+        Region: config.Region,
+        Id: 'inventory_test',
+        InventoryConfiguration: {
+            Id: 'inventory_test',
+            IsEnabled: 'true',
+            Destination: {
+                COSBucketDestination: {
+                    Format: 'CSV',
+                    AccountId: config.AccountId,
+                    Bucket: 'qcs::cos:ap-guangzhou::bucket-logging-' + AppId,
+                    Prefix: 'inventory',
+                    Encryption: {
+                        SSECOS: ''
+                    }
+                }
+            },
+            Schedule: {
+                Frequency: 'Daily'
+            },
+            Filter: {
+                Prefix: 'myPrefix'
+            },
+            IncludedObjectVersions: 'All',
+            OptionalFields: [
+                'Size',
+                'LastModifiedDate',
+                'ETag',
+                'StorageClass',
+                'IsMultipartUploaded',
+                'ReplicationStatus'
+            ]
+        }
+    }, function (err, data) {
+        console.log(err || data);
+    });
+}
+
+function getBucketInventory() {
+    cos.getBucketInventory({
+        Bucket: config.Bucket,
+        Region: config.Region,
+        Id: 'inventory_test'
+    }, function(err, data) {
+        console.log(err || JSON.stringify(data));
+    });
+}
+
+function deleteBucketInventory() {
+    cos.deleteBucketInventory({
+        Bucket: config.Bucket,
+        Region: config.Region,
+        Id: 'inventory_test'
+    }, function(err, data) {
+        console.log(err || JSON.stringify(data));
+    });
+}
+
+function listBucketInventory() {
+    cos.listBucketInventory({
+        Bucket: config.Bucket,
+        Region: config.Region
+    }, function(err, data) {
+        console.log(err || JSON.stringify(data));
+    });
+}
+
 function putObject() {
     // 创建测试文件
     var filename = '1mb.zip';
@@ -874,6 +979,13 @@ getService();
 // getBucketReplication();
 // putBucketReplication();
 // deleteBucketReplication();
+// putBucketLogging();
+// getBucketLogging();
+// deleteBucketLogging();
+// putBucketInventory();
+// getBucketInventory();
+// listBucketInventory();
+// deleteBucketInventory();
 // putObject();
 // putObjectCopy();
 // getObject();
