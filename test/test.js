@@ -2231,7 +2231,13 @@ group('BucketInventory', function () {
             Bucket: config.Bucket,
             Region: config.Region
         }, function (err, data) {
-            assert.ok(comparePlainObject(InventoryConfiguration, data.InventoryConfigurations[0]));
+            var targetInventory;
+            data.InventoryConfigurations.forEach(function (item) {
+                if (item.Id === InventoryConfiguration.Id) {
+                    targetInventory = item;
+                }
+            });
+            assert.ok(comparePlainObject(InventoryConfiguration, targetInventory));
             assert.ok(data.IsTruncated === 'false' || data.IsTruncated === 'true');
             done();
         });
