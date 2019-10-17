@@ -653,14 +653,14 @@ function deleteBucketInventory() {
     });
 }
 
-function listBucketInventory() {
-    cos.listBucketInventory({
-        Bucket: config.Bucket,
-        Region: config.Region
-    }, function(err, data) {
-        console.log(err || JSON.stringify(data));
-    });
-}
+// function listBucketInventory() {
+//     cos.listBucketInventory({
+//         Bucket: config.Bucket,
+//         Region: config.Region
+//     }, function(err, data) {
+//         console.log(err || JSON.stringify(data));
+//     });
+// }
 
 function putObject() {
     // 创建测试文件
